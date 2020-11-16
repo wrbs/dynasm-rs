@@ -7,7 +7,7 @@ use std::sync::{Arc, RwLock, RwLockWriteGuard};
 use std::mem;
 
 use crate::{DynamicLabel, AssemblyOffset, DynasmError, LabelKind, DynasmLabelApi};
-use crate::mmap::{ExecutableBuffer, MutableBuffer};
+use crate::mmap::{ExecutableBuffer, MutableBuffer, cache_management};
 use crate::relocations::{Relocation, RelocationKind, RelocationSize, ImpossibleRelocation};
 
 
@@ -77,6 +77,10 @@ impl MemoryManager {
 
             // allow modifications to be made
             f(&mut new_buffer, self.execbuffer_addr, new_buffer_addr);
+
+            // the modifications themselves handle invalidating the icache lines affected.
+            // but we also need to ensure here that all memory transactions have finished and the pipeline does not contain any more old instructions
+            cache_management::invalidate_pipeline();
 
             // swap the buffers
             self.execbuffer_addr = new_buffer_addr;

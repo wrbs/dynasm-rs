@@ -597,6 +597,8 @@ impl<R: Relocation> Assembler<R> {
                 if reloc.adjust(buf, change).is_err() {
                     *error = Some(DynasmError::ImpossibleRelocation(TargetKind::Managed))
                 }
+
+                mmap::cache_management::invalidate_icache_lines(buf);
             }
         });
 
@@ -800,7 +802,9 @@ pub struct Modifier<'a, R: Relocation> {
 impl<'a, R: Relocation> Modifier<'a, R> {
     /// Move the modifier cursor to the selected location.
     pub fn goto(&mut self, offset: AssemblyOffset) {
+        mmap::cache_management::invalidate_icache_lines(&self.buffer[self.previous_asmoffset .. self.asmoffset]);
         self.old_managed.remove_between(self.previous_asmoffset, self.asmoffset);
+
         self.asmoffset = offset.0;
         self.previous_asmoffset = offset.0;
     }
@@ -842,6 +846,8 @@ impl<'a, R: Relocation> Modifier<'a, R> {
             if loc.needs_adjustment() {
                 self.new_managed.add(loc);
             }
+
+            mmap::cache_management::invalidate_icache_lines(buf);
         }
 
         // Resolve dynamics
@@ -854,6 +860,8 @@ impl<'a, R: Relocation> Modifier<'a, R> {
             if loc.needs_adjustment() {
                 self.new_managed.add(loc);
             }
+
+            mmap::cache_management::invalidate_icache_lines(buf);
         }
 
         // Check for unknown locals
@@ -861,7 +869,9 @@ impl<'a, R: Relocation> Modifier<'a, R> {
             return Err(DynasmError::UnknownLabel(LabelKind::Local(name)));
         }
 
+        mmap::cache_management::invalidate_icache_lines(&self.buffer[self.previous_asmoffset .. self.asmoffset]);
         self.old_managed.remove_between(self.previous_asmoffset, self.asmoffset);
+
         self.previous_asmoffset = self.asmoffset;
 
         self.old_managed.append(&mut self.new_managed);
